@@ -1,8 +1,9 @@
 FROM 812206152185.dkr.ecr.us-west-2.amazonaws.com/latch-base:6839-main
 
-RUN apt-get install -y curl unzip zlib-dev
+RUN apt-get install -y curl unzip
 
 # Get SourcePredict
+RUN pip3 install scipy==1.8.1
 RUN pip install sourcepredict
 
 # STOP HERE:
