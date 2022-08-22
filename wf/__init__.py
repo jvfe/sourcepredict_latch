@@ -2,16 +2,36 @@
 Predict metagenomics sample source with SourcePredict
 """
 
+import re
 import subprocess
-from enum import Enum
-from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
-from latch import medium_task, small_gpu_task, workflow
+from latch import message, small_gpu_task, workflow
 from latch.resources.launch_plan import LaunchPlan
 from latch.types import LatchDir, LatchFile, file_glob
 
 from .docs import metadata
+
+
+# From: https://github.com/latch-verified/bulk-rnaseq/blob/64a25531e1ddc43be0afffbde91af03754fb7c8c/wf/__init__.py
+def _capture_output(command: List[str]) -> Tuple[int, str]:
+    captured_stdout = []
+
+    with subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=True,
+    ) as process:
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line)
+            captured_stdout.append(line)
+        process.wait()
+        returncode = process.returncode
+
+    return returncode, "\n".join(captured_stdout)
 
 
 @small_gpu_task
@@ -31,7 +51,25 @@ def run_sourcepredict(
         sink_count_file.local_path,
     ]
 
-    subprocess.run(_sp_cmd)
+    return_code, stdout = _capture_output(_sp_cmd)
+
+    for step in re.findall("Step.*", stdout):
+        accuracies = re.findall("Testing Accuracy.*", stdout)
+
+        for accuracy in accuracies:
+            message("info", {"title": step, "body": accuracy})
+
+    if return_code != 0:
+        errors = re.findall("Exception.*", stdout)
+        for error in errors:
+            message(
+                "error",
+                {
+                    "title": f"An error was raised while running SourcePredict",
+                    "body": error,
+                },
+            )
+        raise RuntimeError
 
     return file_glob("*.sourcepredict.csv", output_dir.remote_path)
 
