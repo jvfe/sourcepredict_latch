@@ -53,11 +53,10 @@ def run_sourcepredict(
 
     return_code, stdout = _capture_output(_sp_cmd)
 
-    for step in re.findall("Step.*", stdout):
-        accuracies = re.findall("Testing Accuracy.*", stdout)
-
-        for accuracy in accuracies:
-            message("info", {"title": step, "body": accuracy})
+    for step, acc in zip(
+        re.findall("Step.*", stdout), re.findall("Testing Accuracy.*", stdout)
+    ):
+        message("info", {"title": step, "body": acc})
 
     if return_code != 0:
         errors = re.findall("Exception.*", stdout)
